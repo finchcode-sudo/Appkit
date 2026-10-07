@@ -32,3 +32,4 @@ jobs:
         with:
           name: apkextractor-release
           path: app/build/outputs/apk/**/*.apk
+          
