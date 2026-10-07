@@ -331,9 +331,9 @@ fun AppDetailScreen(
                                 ToastManager.showToast(
                                     context,
                                     if (checked)
-                                        "已开启：导出后将通过 Shizuku 自动卸载（全局生效）"
+                                        "已开启：导出后将通过 Shizuku 自动卸载"
                                     else
-                                        "已关闭：导出后不再自动卸载（全局生效）",
+                                        "已关闭：导出后不再自动卸载",
                                     Toast.LENGTH_SHORT
                                 )
                             },
