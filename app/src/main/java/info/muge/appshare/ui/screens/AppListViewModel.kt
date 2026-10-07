@@ -1,0 +1,630 @@
+package info.muge.appshare.ui.screens
+
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.content.pm.ApplicationInfo
+import android.net.Uri
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import info.muge.appshare.Constants
+import info.muge.appshare.Global
+import info.muge.appshare.data.AppChangeRepository
+import info.muge.appshare.items.AppItem
+import info.muge.appshare.tasks.RefreshInstalledListTask
+import info.muge.appshare.tasks.SearchAppItemTask
+import info.muge.appshare.utils.AppListCacheUtil
+import info.muge.appshare.utils.SPUtil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Collections
+import java.util.Date
+import java.util.Locale
+
+/**
+ * 应用类型筛选
+ */
+enum class AppTypeFilter(val label: String) {
+    ALL("全部"),
+    USER("用户应用"),
+    SYSTEM("系统应用")
+}
+
+/**
+ * 大小范围筛选
+ */
+enum class SizeRange(val label: String, val minBytes: Long, val maxBytes: Long) {
+    ALL("全部", 0L, Long.MAX_VALUE),
+    LESS_1MB("< 1 MB", 0L, 1L * 1024 * 1024),
+    MB_1_10("1 - 10 MB", 1L * 1024 * 1024, 10L * 1024 * 1024),
+    MB_10_50("10 - 50 MB", 10L * 1024 * 1024, 50L * 1024 * 1024),
+    MB_50_100("50 - 100 MB", 50L * 1024 * 1024, 100L * 1024 * 1024),
+    MB_100_500("100 - 500 MB", 100L * 1024 * 1024, 500L * 1024 * 1024),
+    MORE_500MB("> 500 MB", 500L * 1024 * 1024, Long.MAX_VALUE)
+}
+
+/**
+ * 筛选配置
+ */
+data class FilterConfig(
+    val appType: AppTypeFilter = AppTypeFilter.ALL,
+    val sizeRange: SizeRange = SizeRange.ALL,
+    val installerSources: Set<String> = emptySet()
+) {
+    val isActive: Boolean
+        get() = appType != AppTypeFilter.ALL ||
+                sizeRange != SizeRange.ALL ||
+                installerSources.isNotEmpty()
+
+    val activeCount: Int
+        get() {
+            var count = 0
+            if (appType != AppTypeFilter.ALL) count++
+            if (sizeRange != SizeRange.ALL) count++
+            if (installerSources.isNotEmpty()) count++
+            return count
+        }
+}
+
+/**
+ * 分组模式
+ */
+enum class GroupMode(val label: String) {
+    NONE("不分组"),
+    BY_TYPE("按类型"),
+    BY_INSTALLER("按安装来源"),
+    BY_UPDATE_TIME("按更新时间"),
+    BY_SIZE("按大小范围"),
+    BY_FIRST_LETTER("按首字母")
+}
+
+/**
+ * AppListScreen 的 UI 状态
+ */
+data class AppListUiState(
+    val appList: List<AppItem> = emptyList(),
+    val groupedAppList: Map<String, List<AppItem>> = emptyMap(),
+    val isLoading: Boolean = true,
+    val isRefreshing: Boolean = false,
+    // 冷启动秒开后，后台悄悄校验/刷新数据时为true。与 isRefreshing 区分开，
+    // 避免触发 PullToRefreshBox 的下拉刷新转圈图标（那个图标应只在用户手动下拉时出现）。
+    val isBackgroundSyncing: Boolean = false,
+    val loadingCurrent: Int = 0,
+    val loadingTotal: Int = 0,
+    val hasPermission: Boolean = false,
+    val selectedItems: Set<String> = emptySet(),
+    val selectedSize: Long = 0L,
+    val highlightKeyword: String? = null,
+    val filterConfig: FilterConfig = FilterConfig(),
+    val groupMode: GroupMode = GroupMode.NONE,
+    val availableInstallers: List<String> = emptyList()
+)
+
+/**
+ * AppListScreen 的 ViewModel
+ */
+class AppListViewModel : ViewModel() {
+    private val _uiState = MutableStateFlow(AppListUiState())
+    val uiState: StateFlow<AppListUiState> = _uiState.asStateFlow()
+
+    private var refreshJob: Job? = null
+    private var searchJob: Job? = null
+
+    // 字母索引缓存：字母 -> 列表中第一次出现的 index
+    private var alphabetIndexMap: Map<Char, Int> = emptyMap()
+
+    // 缓存 SimpleDateFormat 避免反复创建
+    private val monthFormatter = SimpleDateFormat("yyyy-MM", Locale.getDefault())
+
+    /**
+     * 初始化权限状态
+     */
+    fun initPermission(context: Context) {
+        val hasPermission = SPUtil.getGlobalSharedPreferences(context)
+            .getBoolean("show_app", false)
+        val savedFilter = loadSavedFilterConfig(context)
+        _uiState.update { it.copy(hasPermission = hasPermission, filterConfig = savedFilter) }
+    }
+
+    // 是否已经完成过一次秒开式的磁盘缓存加载，避免同一进程内重复读盘
+    private var quickLoadAttempted = false
+
+    // 全量图标预存回填（给几百个应用逐个取图标）只在本次进程真正需要做一次，
+    // 避免每次从详情页返回列表页都重新跑一遍，导致和其他写入操作抢同一把锁而卡住界面
+    private var iconBackfillDoneThisSession = false
+
+    private var lastOfflineCatchupAtMs = 0L
+    private val offlineCatchupThrottleMs = 10_000L
+
+    /**
+     * 刷新应用列表
+     * @param isColdStart 是否为冷启动（进程首次进入该页面）。冷启动时会先尝试用磁盘缓存秒开，
+     *        再在后台做一次真正的全量刷新；非冷启动（比如设置变更后手动刷新）则直接全量刷新。
+     */
+    fun refreshAppList(context: Context, isColdStart: Boolean = false) {
+        if (!_uiState.value.hasPermission) return
+
+        if (isColdStart &&
+            _uiState.value.appList.isNotEmpty() &&
+            System.currentTimeMillis() - lastOfflineCatchupAtMs < offlineCatchupThrottleMs
+        ) {
+            return
+        }
+        lastOfflineCatchupAtMs = System.currentTimeMillis()
+
+        refreshJob?.cancel()
+
+        refreshJob = viewModelScope.launch {
+            val task = RefreshInstalledListTask(context)
+
+            // 冷启动时先记下上一次扫描缓存的快照，稍后用来对比出离线期间（App未运行时）
+            // 发生的安装/卸载/更新，补全变更记录——这份快照会在 task.execute() 结束时被新数据覆盖，
+            // 所以必须在 execute() 之前先读出来。
+            val oldCacheSnapshot: Map<String, Triple<Long, Long, String>> = if (isColdStart) {
+                AppListCacheUtil.load(context).associate {
+                    it.packageName to Triple(it.versionCode, it.lastUpdateTime, it.title)
+                }
+            } else {
+                emptyMap()
+            }
+
+            // 冷启动：先用磁盘缓存秒开一版列表，让用户马上看到内容，而不是空白转圈
+            var quickLoaded = false
+            if (isColdStart && !quickLoadAttempted) {
+                quickLoadAttempted = true
+                val cachedList = task.quickLoadFromCache()
+                if (cachedList.isNotEmpty()) {
+                    quickLoaded = true
+                    val currentState = _uiState.value
+                    val filtered = applyFilter(cachedList, currentState.filterConfig)
+                    val grouped = applyGroup(filtered, currentState.groupMode)
+                    buildAlphabetIndex(filtered)
+                    val quickInstallers = cachedList.map { it.getInstallSource() }
+                        .filter { it.isNotBlank() }
+                        .distinct()
+                        .sorted()
+                    _uiState.update {
+                        it.copy(
+                            isLoading = false,
+                            isBackgroundSyncing = true,
+                            appList = filtered,
+                            groupedAppList = grouped,
+                            availableInstallers = quickInstallers
+                        )
+                    }
+                }
+            }
+
+            // 只有在"当前列表确实是空的"（真正首次进入）时，才展示全屏扫描进度；
+            // 如果已经有数据在显示了（比如从应用详情页返回），就不清空、不打断用户，
+            // 后台悄悄刷新，刷新完再无感替换数据即可
+            val hadDataBefore = _uiState.value.appList.isNotEmpty()
+            val showFullScanUi = !quickLoaded && !hadDataBefore
+
+            if (showFullScanUi) {
+                _uiState.update {
+                    it.copy(
+                        isLoading = true,
+                        loadingCurrent = 0,
+                        loadingTotal = 0,
+                        appList = emptyList(),
+                        groupedAppList = emptyMap()
+                    )
+                }
+            } else if (!quickLoaded && hadDataBefore) {
+                _uiState.update { it.copy(isBackgroundSyncing = true) }
+            }
+
+            val appList = task.execute(
+                onProgressStarted = { total ->
+                    if (showFullScanUi) {
+                        _uiState.update { it.copy(loadingTotal = total) }
+                    }
+                },
+                onProgressUpdated = { current, total ->
+                    if (showFullScanUi) {
+                        _uiState.update { it.copy(loadingCurrent = current, loadingTotal = total) }
+                    }
+                }
+            )
+
+            // 补全应用变更记录：
+            // 1) 用系统记住的 firstInstallTime/lastUpdateTime 回填当前已安装应用的历史（幂等，可重复调用）。
+            //    这一步要给几百个应用逐个取图标缓存，比较耗时，整个App进程生命周期内只需要真正跑一次，
+            //    避免每次从详情页返回列表页都重新触发，导致和其他写入操作抢锁把界面卡住。
+            // 2) 对比上一次缓存快照，补上离线期间发生的安装/卸载/更新（这个比较轻量，每次都可以做）
+            // 注意：这两个操作涉及磁盘IO，必须丢到 IO 线程执行，
+            // 否则会阻塞主线程导致触摸事件处理不过来，触发 ANR
+            if (isColdStart) {
+                withContext(Dispatchers.IO) {
+                    if (!iconBackfillDoneThisSession) {
+                        iconBackfillDoneThisSession = true
+                        AppChangeRepository.backfillFromInstalledPackages(context)
+                    }
+                    AppChangeRepository.diffAndRecordOfflineChanges(context, oldCacheSnapshot, appList)
+                }
+            }
+
+            // 收集所有安装来源
+            val installers = appList.map { it.getInstallSource() }
+                .filter { it.isNotBlank() }
+                .distinct()
+                .sorted()
+
+            val currentState = _uiState.value
+            val filtered = applyFilter(appList, currentState.filterConfig)
+            val grouped = applyGroup(filtered, currentState.groupMode)
+
+            // 构建字母索引缓存
+            buildAlphabetIndex(filtered)
+
+            _uiState.update {
+                it.copy(
+                    isLoading = false,
+                    isRefreshing = false,
+                    isBackgroundSyncing = false,
+                    appList = filtered,
+                    groupedAppList = grouped,
+                    availableInstallers = installers
+                )
+            }
+        }
+    }
+
+    /**
+     * 搜索应用
+     */
+    fun searchApps(keyword: String) {
+        searchJob?.cancel()
+        _uiState.update {
+            it.copy(
+                isRefreshing = true,
+                highlightKeyword = keyword,
+                appList = emptyList(),
+                groupedAppList = emptyMap()
+            )
+        }
+
+        searchJob = viewModelScope.launch {
+            val task = SearchAppItemTask(Global.app_list.toList(), keyword)
+            val results = task.execute()
+            val currentState = _uiState.value
+            val filtered = applyFilter(results, currentState.filterConfig)
+            val grouped = applyGroup(filtered, currentState.groupMode)
+            _uiState.update {
+                it.copy(
+                    isRefreshing = false,
+                    appList = filtered,
+                    groupedAppList = grouped
+                )
+            }
+        }
+    }
+
+    /**
+     * 退出搜索模式
+     */
+    fun exitSearchMode() {
+        val currentState = _uiState.value
+        val source = Global.app_list.toList()
+        val filtered = applyFilter(source, currentState.filterConfig)
+        val grouped = applyGroup(filtered, currentState.groupMode)
+        buildAlphabetIndex(filtered)
+        _uiState.update {
+            it.copy(
+                highlightKeyword = null,
+                appList = filtered,
+                groupedAppList = grouped
+            )
+        }
+    }
+
+    /**
+     * 更新筛选配置
+     */
+    fun updateFilter(context: Context, filterConfig: FilterConfig) {
+        val source = Global.app_list.toList()
+        val filtered = applyFilter(source, filterConfig)
+        val grouped = applyGroup(filtered, _uiState.value.groupMode)
+        buildAlphabetIndex(filtered)
+        _uiState.update {
+            it.copy(
+                filterConfig = filterConfig,
+                appList = filtered,
+                groupedAppList = grouped
+            )
+        }
+        saveFilterConfig(context, filterConfig)
+    }
+
+    private fun saveFilterConfig(context: Context, filterConfig: FilterConfig) {
+        SPUtil.getGlobalSharedPreferences(context).edit()
+            .putString(Constants.PREFERENCE_FILTER_APP_TYPE, filterConfig.appType.name)
+            .putString(Constants.PREFERENCE_FILTER_SIZE_RANGE, filterConfig.sizeRange.name)
+            .putString(Constants.PREFERENCE_FILTER_INSTALLERS, filterConfig.installerSources.joinToString("\u0001"))
+            .apply()
+    }
+
+    private fun loadSavedFilterConfig(context: Context): FilterConfig {
+        val settings = SPUtil.getGlobalSharedPreferences(context)
+        val appType = try {
+            AppTypeFilter.valueOf(settings.getString(Constants.PREFERENCE_FILTER_APP_TYPE, null) ?: "ALL")
+        } catch (_: Exception) {
+            AppTypeFilter.ALL
+        }
+        val sizeRange = try {
+            SizeRange.valueOf(settings.getString(Constants.PREFERENCE_FILTER_SIZE_RANGE, null) ?: "ALL")
+        } catch (_: Exception) {
+            SizeRange.ALL
+        }
+        val installers = settings.getString(Constants.PREFERENCE_FILTER_INSTALLERS, null)
+            ?.split("\u0001")
+            ?.filter { it.isNotBlank() }
+            ?.toSet()
+            ?: emptySet()
+        return FilterConfig(appType = appType, sizeRange = sizeRange, installerSources = installers)
+    }
+
+    /**
+     * 重置筛选
+     */
+    fun resetFilter(context: Context) {
+        updateFilter(context, FilterConfig())
+    }
+
+    /**
+     * 设置分组模式
+     */
+    fun setGroupMode(mode: GroupMode) {
+        val grouped = applyGroup(_uiState.value.appList, mode)
+        _uiState.update {
+            it.copy(
+                groupMode = mode,
+                groupedAppList = grouped
+            )
+        }
+    }
+
+    /**
+     * 应用筛选逻辑
+     */
+    private fun applyFilter(list: List<AppItem>, config: FilterConfig): List<AppItem> {
+        if (!config.isActive) return list
+
+        return list.filter { app ->
+            // 应用类型筛选
+            val typeMatch = when (config.appType) {
+                AppTypeFilter.ALL -> true
+                AppTypeFilter.USER -> !app.isRedMarked()
+                AppTypeFilter.SYSTEM -> app.isRedMarked()
+            }
+
+            // 大小范围筛选
+            val sizeMatch = app.getSize() in config.sizeRange.minBytes until config.sizeRange.maxBytes
+
+            // 安装来源筛选
+            val installerMatch = config.installerSources.isEmpty() ||
+                    config.installerSources.contains(app.getInstallSource())
+
+            typeMatch && sizeMatch && installerMatch
+        }
+    }
+
+    /**
+     * 应用分组逻辑
+     */
+    private fun applyGroup(list: List<AppItem>, mode: GroupMode): Map<String, List<AppItem>> {
+        if (mode == GroupMode.NONE) return emptyMap()
+
+        return list.groupBy { app ->
+            when (mode) {
+                GroupMode.NONE -> ""
+                GroupMode.BY_TYPE -> if (app.isRedMarked()) "系统应用" else "用户应用"
+                GroupMode.BY_INSTALLER -> app.getInstallSource().ifBlank { "未知来源" }
+                GroupMode.BY_UPDATE_TIME -> {
+                    try {
+                        monthFormatter.format(Date(app.getPackageInfo().lastUpdateTime))
+                    } catch (_: Exception) {
+                        "未知"
+                    }
+                }
+                GroupMode.BY_SIZE -> {
+                    val mb = app.getSize() / (1024.0 * 1024.0)
+                    when {
+                        mb < 1 -> "< 1 MB"
+                        mb < 10 -> "1 - 10 MB"
+                        mb < 50 -> "10 - 50 MB"
+                        mb < 100 -> "50 - 100 MB"
+                        mb < 500 -> "100 - 500 MB"
+                        else -> "> 500 MB"
+                    }
+                }
+                GroupMode.BY_FIRST_LETTER -> {
+                    try {
+                        val pinyin = app.getCachedPinyin()
+                        val first = pinyin.firstOrNull()?.uppercaseChar() ?: '#'
+                        if (first in 'A'..'Z') first.toString() else "#"
+                    } catch (_: Exception) {
+                        "#"
+                    }
+                }
+            }
+        }.toSortedMap()
+    }
+
+    /**
+     * 构建字母索引缓存，记录每个字母在列表中第一次出现的位置
+     */
+    private fun buildAlphabetIndex(list: List<AppItem>) {
+        alphabetIndexMap = buildMap {
+            list.forEachIndexed { index, app ->
+                val letter = try {
+                    val pinyin = app.getCachedPinyin()
+                    val first = pinyin.firstOrNull()?.uppercaseChar() ?: '#'
+                    if (first in 'A'..'Z') first else '#'
+                } catch (_: Exception) {
+                    '#'
+                }
+                putIfAbsent(letter, index)
+            }
+        }
+    }
+
+    /**
+     * 获取字母对应的列表索引位置（O(1) 查询）
+     */
+    fun getAlphabetIndex(letter: Char): Int {
+        return alphabetIndexMap[letter] ?: -1
+    }
+
+    /**
+     * 授予权限
+     */
+    fun grantPermission(context: Context) {
+        SPUtil.getGlobalSharedPreferences(context)
+            .edit()
+            .putBoolean("show_app", true)
+            .apply()
+        _uiState.update { it.copy(hasPermission = true) }
+        refreshAppList(context)
+    }
+
+    /**
+     * 切换选中项
+     */
+    fun toggleSelection(app: AppItem) {
+        val pkgName = app.getPackageName()
+        _uiState.update { state ->
+            val newSelected = state.selectedItems.toMutableSet()
+            val newSize = if (newSelected.contains(pkgName)) {
+                newSelected.remove(pkgName)
+                state.selectedSize - app.getSize()
+            } else {
+                newSelected.add(pkgName)
+                state.selectedSize + app.getSize()
+            }
+            state.copy(selectedItems = newSelected, selectedSize = newSize)
+        }
+    }
+
+    /**
+     * 全选/取消全选
+     */
+    fun toggleSelectAll() {
+        _uiState.update { state ->
+            if (state.selectedItems.size == state.appList.size) {
+                state.copy(selectedItems = emptySet(), selectedSize = 0L)
+            } else {
+                val allPkgs = state.appList.map { it.getPackageName() }.toSet()
+                val totalSize = state.appList.sumOf { it.getSize() }
+                state.copy(selectedItems = allPkgs, selectedSize = totalSize)
+            }
+        }
+    }
+
+    /**
+     * 反选
+     */
+    fun invertSelection() {
+        _uiState.update { state ->
+            val allPkgs = state.appList.map { it.getPackageName() }.toSet()
+            val inverted = allPkgs - state.selectedItems
+            val invertedSize = state.appList
+                .filter { inverted.contains(it.getPackageName()) }
+                .sumOf { it.getSize() }
+            state.copy(selectedItems = inverted, selectedSize = invertedSize)
+        }
+    }
+
+    /**
+     * 清空选择
+     */
+    fun clearSelection() {
+        _uiState.update { it.copy(selectedItems = emptySet(), selectedSize = 0L) }
+    }
+
+    /**
+     * 排序
+     */
+    fun sortApps(sortValue: Int) {
+        AppItem.sort_config = sortValue
+        synchronized(Global.app_list) {
+            Collections.sort(Global.app_list)
+        }
+        val currentState = _uiState.value
+        val source = Global.app_list.toList()
+        val filtered = applyFilter(source, currentState.filterConfig)
+        val grouped = applyGroup(filtered, currentState.groupMode)
+        buildAlphabetIndex(filtered)
+        _uiState.update { it.copy(appList = filtered, groupedAppList = grouped) }
+    }
+
+    /**
+     * 是否有选中项
+     */
+    fun hasSelection(): Boolean = _uiState.value.selectedItems.isNotEmpty()
+
+    // 应用变更广播监听
+    private var packageChangeReceiver: BroadcastReceiver? = null
+
+    /**
+     * 注册应用安装/卸载/更新广播监听（仅用于App存活时"实时刷新界面列表"，
+     * 记录变更历史的职责已经移交给清单里静态注册的 PackageChangeReceiver，
+     * 那边不管进程死活都能可靠触发，这里不再重复写记录，避免同一事件记两遍）
+     */
+    fun registerPackageChangeListener(context: Context) {
+        if (packageChangeReceiver != null) return
+
+        packageChangeReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                val changedPkg = intent?.data?.schemeSpecificPart
+                if (changedPkg == context.packageName) return
+
+                val action = intent?.action
+                if (action != Intent.ACTION_PACKAGE_ADDED &&
+                    action != Intent.ACTION_PACKAGE_REMOVED &&
+                    action != Intent.ACTION_PACKAGE_REPLACED
+                ) return
+
+                // 自动刷新列表
+                if (_uiState.value.hasPermission && !_uiState.value.isLoading) {
+                    refreshAppList(context)
+                }
+            }
+        }
+
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
+            addAction(Intent.ACTION_PACKAGE_REPLACED)
+            addDataScheme("package")
+        }
+        context.registerReceiver(packageChangeReceiver, filter)
+    }
+
+    /**
+     * 注销广播监听
+     */
+    fun unregisterPackageChangeListener(context: Context) {
+        packageChangeReceiver?.let {
+            try {
+                context.unregisterReceiver(it)
+            } catch (_: Exception) { }
+            packageChangeReceiver = null
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        refreshJob?.cancel()
+        searchJob?.cancel()
+    }
+}

@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="action_settings">Settings</string>
+    <string name="action_search">Search</string>
+    <string name="action_sort">Sort</string>
+    <string name="action_view">View mode</string>
+    <string name="action_confirm">Confirm</string>
+    <string name="action_cancel">@android:string/cancel</string>
+    <string name="nav_about">About</string>
+    <string name="dialog_loading_title">Loading</string>
+    <string name="dialog_sort_appitem_title">Sort by(APP)</string>
+    <string name="dialog_sort_import_item_title">Sort by(Packages)</string>
+
+    <string name="permission_write">Need to grant the permission of reading/writing external storage</string>
+    <string name="permission_grant">Grant</string>
+
+    <string name="main_card_show_system_app">Show system apps</string>
+    <string name="main_card_remaining_storage">Remaining space</string>
+    <string name="bottom_export">export</string>
+    <string name="select_all_change">sel/des</string>
+    <string name="bottom_share">Share</string>
+    <string name="bottom_more">more</string>
+    <string name="more_copy_package_names">copy package names</string>
+    <string name="more_file_rename">Rename</string>
+    <string name="hint_file_rename">Type in file name or variables</string>
+    <string name="main_page_export">Applications</string>
+
+    <string name="activity_package_detail">Install by APK Kit</string>
+    <string name="activity_package_detail_blank">None valid data found, please try to re-open</string>
+    <string name="activity_package_detail_apk_attention">Please use other packaging apps to install APK</string>
+    <string name="activity_detail_run">Run</string>
+    <string name="activity_detail_export">Export</string>
+    <string name="activity_detail_share">Share</string>
+    <string name="activity_detail_system_detail">Details</string>
+    <string name="activity_detail_market">View on market</string>
+    <string name="activity_detail_uninstall">Uninstall</string>
+    <string name="activity_detail_package_name">Package name</string>
+    <string name="activity_detail_version_info">Version</string>
+    <string name="activity_detail_package_size">Package size</string>
+    <string name="activity_detail_first_install_time">First installed</string>
+    <string name="activity_detail_last_update_time">Last updated</string>
+    <string name="activity_detail_installer_name">Installed by</string>
+    <string name="activity_detail_minimum_api">Minimum API</string>
+    <string name="activity_detail_target_api">Target API</string>
+    <string name="activity_detail_is_system_app">Is system app</string>
+    <string name="activity_detail_path">Path/Uri</string>
+    <string name="activity_detail_launch_intent">Launching class</string>
+    <string name="activity_detail_install">Install</string>
+    <string name="activity_detail_delete">Delete</string>
+    <string name="activity_detail_file_name">File name</string>
+    <string name="activity_detail_file_size">File size</string>
+    <string name="activity_detail_last_modified">Last modified</string>
+    <string name="activity_detail_nothing_checked">Please check the options to install</string>
+    <string name="activity_detail_wait_loading">Please wait while the package is being reading, and it may take some time</string>
+
+    <string name="activity_detail_signature_head">Signature Info</string>
+    <string name="signature_scheme_title">Signature Scheme</string>
+    <string name="activity_detail_signature_issuer">Signature issuer</string>
+    <string name="activity_detail_signature_subject">Signature owner</string>
+    <string name="activity_detail_signature_serial">Serial number</string>
+    <string name="activity_detail_signature_start">Start time</string>
+    <string name="activity_detail_signature_end">End time</string>
+    <string name="activity_detail_signature_pubkey_format">Public key format</string>
+    <string name="activity_detail_signature_pubkey_algorithm">Public key algorithm</string>
+    <string name="activity_detail_signature_pubkey_exponent">Public key exponent</string>
+    <string name="activity_detail_signature_modulus_size">Modulus size</string>
+    <string name="activity_detail_signature_modulus">Modulus</string>
+    <string name="activity_detail_signature_sigalg">Signature algorithm</string>
+    <string name="activity_detail_signature_sigalg_oid">Signature algorithm OID</string>
+    <string name="activity_detail_signature_md5">MD5</string>
+    <string name="activity_detail_signature_sha1">SHA1</string>
+    <string name="activity_detail_signature_sha256">SHA256</string>
+    <string name="activity_detail_signature_crc32">CRC32</string>
+    <string name="activity_detail_signature_cert_hex">Certificate (Hex)</string>
+
+    <string name="activity_detail_hash_head">Hash values of the file</string>
+    <string name="activity_detail_hash_md5">MD5</string>
+    <string name="activity_detail_hash_sha1">SHA1</string>
+    <string name="activity_detail_hash_sha256">SHA256</string>
+    <string name="activity_detail_hash_crc32">CRC32</string>
+
+    <string name="activity_settings_title">Settings</string>
+    <string name="activity_settings_path">Exporting path</string>
+    <string name="activity_settings_rules">Exporting rules</string>
+    <string name="activity_settings_night_mode">Night mode</string>
+    <string name="activity_settings_loading_options">Loading options</string>
+    <string name="activity_settings_about">About</string>
+    <string name="activity_settings_feedback">Feedback</string>
+
+    <string name="activity_folder_selector_title">Selecting path</string>
+
+    <string name="night_mode_enabled">enabled</string>
+    <string name="night_mode_disabled">disabled</string>
+    <string name="night_mode_auto">auto</string>
+    <string name="night_mode_follow_system">follow system</string>
+
+    <string name="dialog_export_title">Exporting</string>
+    <string name="dialog_export_msg_apk">Copying to :</string>
+    <string name="dialog_export_zip">Compressing :</string>
+    <string name="dialog_export_stop">stop</string>
+
+    <string name="dialog_import_duplicate_title">Files already exist</string>
+    <string name="dialog_import_duplicate_message">File(s) listed below are already existed in the main storage, confirm to overwrite it(them)?\n\n</string>
+    <string name="dialog_import_duplicate_more"> more files</string>
+
+    <string name="dialog_import_title">Importing</string>
+    <string name="dialog_import_msg">Decompressing to </string>
+
+    <string name="dialog_import_delete_title">Deleting files</string>
+    <string name="dialog_import_delete_message">Confirm to delete the files selected ?</string>
+
+    <string name="toast_export_complete">The app(s) are exported to </string>
+    <string name="toast_import_complete">Importing completed, if there is any apk packages, try to install them manually</string>
+
+    <string name="dialog_export_uninstall_title">Backup complete</string>
+    <string name="dialog_export_uninstall_message">"%1$s" has been backed up. Uninstall it now?</string>
+    <string name="dialog_export_uninstall_confirm">Uninstall</string>
+    <string name="dialog_export_uninstall_cancel">Not now</string>
+    <string name="toast_uninstall_not_allowed">This app cannot be uninstalled (it may be a system app)</string>
+
+    <string name="dialog_import_finished_error_title">Attention</string>
+    <string name="dialog_import_finished_error_message">The following file(s) occur errors while importing, the infos are listed bellow\n\n</string>
+
+    <string name="exception_title">Attention</string>
+    <string name="exception_message">The file(s) listed bellow occur errors while exporting,
+        the errors may include not enough storage space, source file was deleted, invalid writing path, or has no writing permission\nThe error infos are bellow\n\n</string>
+
+    <string name="dialog_duplicate_title">Files already exist</string>
+    <string name="dialog_duplicate_msg">The file(s) below is(are) already exist, overwrite them ? \n\n</string>
+
+    <string name="dialog_wait">Please wait&#8230;</string>
+    <string name="dialog_data_obb_title">Additional options</string>
+    <string name="dialog_data_obb_message">The app(s) selected contain(s) data or obb in the external storage, check the following options
+        will package them to a zip file</string>
+    <string name="dialog_data_obb_export_data">Export Data files</string>
+    <string name="dialog_data_obb_export_obb">Export Obb files</string>
+    <string name="dialog_exporting">Exporting…</string>
+    <string name="dialog_importing">Importing…</string>
+
+    <string name="dialog_button_confirm">Confirm</string>
+    <string name="dialog_button_cancel">Cancel</string>
+
+    <string name="share_title">Share</string>
+
+    <string name="activity_detail_permissions">Permissions</string>
+    <string name="activity_detail_activities">Activities</string>
+    <string name="activity_detail_receivers">Broadcast receivers</string>
+    <string name="activity_detail_static_loaders">Auto start receivers</string>
+    <string name="activity_detail_services">Services</string>
+    <string name="activity_detail_providers">Providers</string>
+
+    <string name="dialog_loading_selection_att">The more checked, the more slow will be while loading -_-</string>
+    <string name="dialog_loading_selection_permissions">uses-permissions</string>
+    <string name="dialog_loading_selection_activities">activity</string>
+    <string name="dialog_loading_selection_services">service</string>
+    <string name="dialog_loading_selection_providers">provider</string>
+    <string name="dialog_loading_selection_receivers">receiver</string>
+    <string name="dialog_loading_selection_static_loaders">Auto start receivers(will take more time while loading)</string>
+    <string name="dialog_loading_selection_signature">APK Signature</string>
+    <string name="dialog_loading_selection_file_hash">Hash values</string>
+
+    <string name="dialog_sort_default">Default</string>
+    <string name="dialog_sort_ascending_name">Ascending by name(A→Z)</string>
+    <string name="dialog_sort_descending_name">Descending by name(Z→A)</string>
+    <string name="dialog_sort_ascending_size">Ascending by size(smaller→larger)</string>
+    <string name="dialog_sort_descending_size">Descending by size(larger→smaller)</string>
+    <string name="dialog_sort_ascending_date">Ascending by updating time(older→newer)</string>
+    <string name="dialog_sort_descending_date">Descending by updating time(newer→older)</string>
+    <string name="dialog_sort_ascending_install_date">Ascending by installing time(older→newer)</string>
+    <string name="dialog_sort_descending_install_date">Descending by installing time(newer→older)</string>
+    <string name="dialog_sort_ascending_modified_time">Ascending by last modified time(older→newer)</string>
+    <string name="dialog_sort_descending_modified_time">Descending by last modified time(newer→older)</string>
+    <string name="dialog_sort_ascending_package_name">Ascending by package name(A→Z)</string>
+    <string name="dialog_sort_descending_package_name">Descending by package name(Z→A)</string>
+
+    <string name="dialog_filename_title">Exporting rules</string>
+    <string name="dialog_filename_apk_att">APK naming rules</string>
+    <string name="dialog_filename_zip_att">compressed file naming rules</string>
+    <string name="dialog_filename_variables">insert variables</string>
+    <string name="dialog_filename_button_appname">app name(?N)</string>
+    <string name="dialog_filename_button_packagename">package name(?P)</string>
+    <string name="dialog_filename_button_version">version name(?V)</string>
+    <string name="dialog_filename_button_versioncode">version code(?C)</string>
+    <string name="dialog_filename_button_year">Year(?Y)</string>
+    <string name="dialog_filename_button_month">Month(?M)</string>
+    <string name="dialog_filename_button_day_of_month">Day(?D)</string>
+    <string name="dialog_filename_button_hour_of_day">Hour(?H)</string>
+    <string name="dialog_filename_button_minute">Minute(?I)</string>
+    <string name="dialog_filename_button_second">Second(?S)</string>
+    <string name="dialog_filename_button_sequence_number">Seq(?A)</string>
+    <string name="dialog_filename_preview_appname">exampleApp</string>
+    <string name="dialog_filename_preview_packagename">com.example</string>
+    <string name="dialog_filename_preview_version">1.0</string>
+    <string name="dialog_filename_preview_versioncode">1</string>
+    <string name="dialog_filename_toast_blank">Naming rule(s) can not be empty</string>
+    <string name="dialog_filename_warn_no_variables">no unique variable(?N, ?P,?A), file overwrite may occur during export!</string>
+    <string name="dialog_filename_rename_warn_no_variables">no unique variable(?A), errors may occur during renaming files!</string>
+    <string name="dialog_filename_rename_warn_no_variables_confirm">(Click again to continue forcibly) no unique variable(?A), errors may occur during renaming files!</string>
+    <string name="dialog_filename_confirm">Click again to continue</string>
+
+    <string name="activity_send_by_title">Sending by APK Kit</string>
+
+    <string name="activity_receive_title">Receive Files</string>
+
+    <string name="snack_bar_clipboard">has been copied to clipboard</string>
+    <string name="snack_bar_no_app_selected">Please select any apps to copy</string>
+
+    <string name="external_storage">External storage</string>
+
+    <string name="hint_filename_apk">type in APK naming rule</string>
+    <string name="hint_filename_zip">type in compressed file naming rule</string>
+    <string name="hint_compress_custom">type in custom extension name</string>
+
+    <string name="text_hint_searchview">searching info</string>
+
+    <string name="zip_level_att">compressing level</string>
+    <string name="zip_level_default">default</string>
+    <string name="zip_level_stored">stored</string>
+    <string name="zip_level_low">low</string>
+    <string name="zip_level_normal">normal</string>
+    <string name="zip_level_high">high</string>
+
+    <string name="file_invalid_name">the file name contains illegal character(s)</string>
+
+
+    <string name="unit_item">item(s)</string>
+    <string name="word_zip">zip</string>
+    <string name="word_xapk">xapk</string>
+    <string name="word_compressed">compressed</string>
+    <string name="word_unknown">unknown</string>
+    <string name="word_preview">preview</string>
+    <string name="word_blank">blank</string>
+    <string name="word_yes">yes</string>
+    <string name="word_no">no</string>
+    <string name="word_none">none</string>
+    <string name="word_stop">stop</string>
+    <string name="word_content_blank">No contents</string>
+    <string name="search_no_result">No matching apps found</string>
+    <string name="word_custom">custom</string>
+    <string name="att_loading">Loading&#8230;</string>
+    <string name="att_checking_duplication">Checking duplication files&#8230;</string>
+
+    <string name="language_follow_system">follow system</string>
+
+    <string name="dialog_about_message">\n(Translated by machine)This is a small tool for the Android platform to quickly query the locally installed APP.\n
+        Open source:\n
+         https://github.com/ghmxr/appshare \n\n
+        MailBox: \n
+        mxremail@qq.com \n\n
+        Donate:
+        </string>
+    <string name="activity_settings_device_name">Device name</string>
+    <string name="dialog_settings_device_name_head">Type a name to show to the sending side while sharing files through local network.</string>
+    <string name="dialog_settings_package_name_split_head">Enter the delimited content when batch copying the application package names</string>
+    <string name="dialog_settings_device_name_hint">type in a name</string>
+    <string name="dialog_settings_package_name_split">type in separator</string>
+    <string name="activity_settings_package_name_separator">Pkg Name Separator</string>
+    <string name="dialog_settings_device_name_invalid">type in a name</string>
+    <string name="word_keep_screen_on">keep screen on</string>
+    <string name="dialog_compress_extension_empty">type in a valid extension name</string>
+    <string name="activity_settings_extension">Compressed ExtName</string>
+    <string name="dialog_compress_extension_att">*this option only changes the extension of the compressed exporting files, but will not change the content of zip itself</string>
+
+    <!-- New internationalized strings -->
+    <string name="nav_statistics">Statistics</string>
+    <string name="loading_scanning_apps">Scanning apps…</string>
+    <string name="empty_pull_to_refresh">Pull to refresh to load app list</string>
+    <string name="permission_read_app_list">Permission required to read app list</string>
+    <string name="permission_grant_short">Grant</string>
+    <string name="copy_package_names">Copy Package Names</string>
+    <string name="app_no_launcher">App has no launcher interface</string>
+    <string name="choose_action">Choose Action</string>
+    <string name="copied">Copied</string>
+    <string name="search_hint">Search apps…</string>
+    <string name="search_label">Search</string>
+    <string name="back_label">Back</string>
+    <string name="clear_label">Clear</string>
+    <string name="setting_dynamic_color">Dynamic Color</string>
+    <string name="setting_dynamic_color_desc">Generate theme from wallpaper colors (Material You)</string>
+    <string name="invert_selection">Invert</string>
+    <string name="deselect_all">Deselect All</string>
+
+    <!-- Statistics screen -->
+    <string name="stats_tab_export">Export</string>
+    <string name="stats_tab_permission">Permissions</string>
+    <string name="stats_sort_by_count">By Count</string>
+    <string name="stats_sort_by_name">By Name</string>
+    <string name="stats_detail_data">Detail Data</string>
+    <string name="stats_no_data">No data for current filter</string>
+    <string name="stats_load_failed">Load failed</string>
+    <string name="stats_partial_data_error">Some data may not be updated</string>
+
+    <!-- Main screen -->
+    <string name="menu_filter">Filter</string>
+    <string name="menu_more">More</string>
+    <string name="menu_group">Group</string>
+    <string name="menu_group_active">Group (%1$s)</string>
+    <string name="menu_switch_to_grid">Switch to Grid</string>
+    <string name="menu_switch_to_list">Switch to List</string>
+    <string name="dialog_select_group_mode">Select Group Mode</string>
+
+    <!-- Export enhancements -->
+    <string name="export_retry">Retry</string>
+    <string name="export_retry_message">Retrying export %1$s (%2$d/%3$d)</string>
+    <string name="export_all_failed">All retries failed</string>
+
+    <!-- Custom App Groups -->
+    <string name="group_manage_title">Manage Groups</string>
+    <string name="group_manage_app_title">Manage groups for \"%1$s\"</string>
+    <string name="group_empty_hint">No groups yet, tap below to create</string>
+    <string name="group_create">Create Group</string>
+    <string name="group_create_title">Create Group</string>
+    <string name="group_edit">Edit</string>
+    <string name="group_edit_title">Edit Group</string>
+    <string name="group_delete">Delete Group</string>
+    <string name="group_delete_title">Delete Group</string>
+    <string name="group_delete_message">Are you sure you want to delete group \"%1$s\"? This cannot be undone.</string>
+    <string name="group_name_label">Group Name</string>
+    <string name="group_color_label">Group Color</string>
+    <string name="group_app_count">%1$d apps</string>
+    <string name="group_filter_label">Custom Groups</string>
+</resources>

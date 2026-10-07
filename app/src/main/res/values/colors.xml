@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主题颜色 -->
+    <color name="colorAccent">#4285F4</color>
+    <color name="colorTitle">#4285F4</color>
+    <color name="colorTitleDark">#4285F4</color>
+
+    <!-- 对话框样式颜色 -->
+    <color name="standardHintColor">#666666</color>
+    <color name="standardTextColor">#111111</color>
+    <color name="titleViewBgColor">#ffffff</color>
+</resources>
