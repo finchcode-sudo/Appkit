@@ -13,6 +13,10 @@
 
     <string name="permission_write">需要授权读取/写入存储权限</string>
     <string name="permission_grant">立即授权</string>
+    <string name="permission_dialog_title">“AppKit”需要读取应用列表</string>
+    <string name="permission_dialog_message">为了展示设备上的应用，AppKit 需要读取您的已安装应用列表。数据仅保存在本地，绝不上传。</string>
+    <string name="permission_dialog_allow">去授权</string>
+    <string name="permission_dialog_deny">取消</string>
 
     <string name="main_card_show_system_app">显示系统应用</string>
     <string name="main_card_remaining_storage">剩余存储空间</string>
