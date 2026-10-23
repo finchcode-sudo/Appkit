@@ -1,6 +1,5 @@
 package info.muge.appshare.ui.screens
 
-import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -24,7 +23,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -33,7 +31,6 @@ import androidx.compose.material3.Snackbar
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -58,7 +55,6 @@ import info.muge.appshare.items.AppItem
 import info.muge.appshare.ui.components.AlphabetIndexBar
 import info.muge.appshare.ui.dialogs.SortConfigDialog
 import info.muge.appshare.ui.theme.AppDimens
-import info.muge.appshare.utils.PermissionExts
 import info.muge.appshare.utils.SPUtil
 import info.muge.appshare.utils.findActivity
 import kotlinx.coroutines.delay
@@ -85,15 +81,13 @@ fun AppListScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
 
-    // 权限说明弹窗状态
-    var showPermissionDialog by remember { mutableStateOf(false) }
-
     // 批量卸载：系统不允许非root应用静默卸载多个应用，只能逐个弹出系统确认框排队处理
     var uninstallQueue by remember { mutableStateOf<List<String>>(emptyList()) }
     var uninstallIndex by remember { mutableStateOf(0) }
     val uninstallLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
     ) {
+        // 无论用户确认还是取消这一个，都继续弹下一个，直到队列处理完
         val nextIndex = uninstallIndex + 1
         if (nextIndex < uninstallQueue.size) {
             uninstallIndex = nextIndex
@@ -112,6 +106,7 @@ fun AppListScreen(
             try {
                 uninstallLauncher.launch(intent)
             } catch (e: Exception) {
+                // 该应用无法卸载（如系统应用），跳过继续下一个
                 val nextIndex = uninstallIndex + 1
                 if (nextIndex < uninstallQueue.size) {
                     uninstallIndex = nextIndex
@@ -123,19 +118,17 @@ fun AppListScreen(
         }
     }
 
-    // 初始化权限状态
+    // 初始化
     LaunchedEffect(Unit) {
         viewModel.initPermission(context)
     }
 
-    // 监听权限状态，若无权限则弹窗
-    LaunchedEffect(state.hasPermission) {
-        if (!state.hasPermission) {
-            showPermissionDialog = true
-        }
-    }
-
     // 监听应用安装/卸载/更新，自动刷新列表
+    // 注意：这个 DisposableEffect 只在"应用"这个页面挂载的时候生效——如果用户跳转到
+    // "应用变更记录"等子页面，这个页面会从组合树里移除，广播监听跟着被注销，
+    // 这期间发生的卸载完全收不到通知。所以每次重新回到这个页面（effect 重新执行）时，
+    // 都主动做一次冷启动式的离线变更校验（对比磁盘缓存快照），把这段时间错过的
+    // 安装/卸载/更新补记录回来，不能只靠广播这一条路。
     DisposableEffect(viewModel) {
         viewModel.registerPackageChangeListener(context)
         viewModel.refreshAppList(context, isColdStart = true)
@@ -194,35 +187,6 @@ fun AppListScreen(
         )
     }
 
-    // 权限说明弹窗
-    if (showPermissionDialog && !state.hasPermission) {
-        AlertDialog(
-            onDismissRequest = { showPermissionDialog = false },
-            title = {
-                Text(text = stringResource(id = R.string.permission_dialog_title))
-            },
-            text = {
-                Text(text = stringResource(id = R.string.permission_dialog_message))
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    showPermissionDialog = false
-                    // 跳转系统设置
-                    PermissionExts.requestReadInstallApps(context.findActivity()) {
-                        viewModel.grantPermission(context)
-                    }
-                }) {
-                    Text(text = stringResource(id = R.string.permission_dialog_allow))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showPermissionDialog = false }) {
-                    Text(text = stringResource(id = R.string.permission_dialog_deny))
-                }
-            }
-        )
-    }
-
     val listState = rememberLazyListState()
 
     // 字母索引条：列表视图 + 非搜索 + 无分组时显示
@@ -260,6 +224,11 @@ fun AppListScreen(
         },
         bottomBar = {
             when {
+                !state.hasPermission -> PermissionBottomBar(
+                    onPermissionGranted = {
+                        viewModel.grantPermission(context)
+                    }
+                )
                 isMultiSelectMode -> MultiSelectCard(
                     selectedCount = state.selectedItems.size,
                     selectedSize = state.selectedSize,
