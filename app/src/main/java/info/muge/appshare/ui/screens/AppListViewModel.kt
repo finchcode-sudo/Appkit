@@ -128,8 +128,8 @@ class AppListViewModel : ViewModel() {
      * 初始化权限状态
      */
     fun initPermission(context: Context) {
-        val hasPermission = SPUtil.getGlobalSharedPreferences(context)
-            .getBoolean("show_app", false)
+        // 系统已允许读取应用列表时直接放行，不再要求用户先点一次授权按钮
+        val hasPermission = info.muge.appshare.utils.PermissionExts.canReadInstalledApps(context)
         val savedFilter = loadSavedFilterConfig(context)
         _uiState.update { it.copy(hasPermission = hasPermission, filterConfig = savedFilter) }
     }
