@@ -19,11 +19,10 @@ object PermissionExts {
     fun canReadInstalledApps(context: Context): Boolean {
         val sp = SPUtil.getGlobalSharedPreferences(context)
         if (sp.getBoolean(KEY_SHOW_APP, false)) return true
+        // 只用系统自带 API 判断：能读到足够多的应用，说明系统已放行
+        // （被限制时只能看到自己和寥寥几个系统包）
         val granted = try {
-            XXPermissions.isGrantedPermissions(
-                context,
-                PermissionLists.getGetInstalledAppsPermission()
-            )
+            context.packageManager.getInstalledPackages(0).size > 15
         } catch (e: Exception) {
             false
         }
