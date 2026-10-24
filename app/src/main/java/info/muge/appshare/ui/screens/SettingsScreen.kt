@@ -865,7 +865,7 @@ private fun AboutDialog(
                 )
                 Spacer(modifier = Modifier.height(12.dp))
                 // GitHub 源码链接
-                val githubUrl = "https://github.com/finchcode-sudo/apkextractor"
+                val githubUrl = "https://github.com/finchcode-sudo/Appkit"
                 Text(
                     text = "源码地址：$githubUrl",
                     style = MaterialTheme.typography.bodySmall,
