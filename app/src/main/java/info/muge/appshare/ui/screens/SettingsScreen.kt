@@ -40,6 +40,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -88,17 +89,26 @@ fun SettingsScreen(
     // 选择器用 OpenDocument + MIME 白名单（与 SukiSU 选 zip 的做法一致），系统选择器会据此隐藏
     // 图片/视频/文档等无关文件。apks/xapk/apkm/apkx 没有专属 MIME，系统通常把它们识别为
     // zip 或 octet-stream，所以白名单里一并包含；同类型但扩展名不对的文件（如 .properties）
-    // 仍可能出现，因此选完后再按扩展名校验一次。
+    // 仍可能出现，因此选完后按扩展名校验，压缩包再检查里面是否有 apk。
+    val analyzerScope = androidx.compose.runtime.rememberCoroutineScope()
     val apkAnalyzerLauncher = rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
             val fileName = info.muge.appshare.utils.SplitApkInstaller.queryDisplayName(context, it).lowercase()
-            val supported = listOf(".apk", ".apks", ".xapk", ".apkm", ".apkx").any { ext -> fileName.endsWith(ext) }
-            if (supported) {
+            val supported = listOf(".apk", ".zip", ".apks", ".xapk", ".apkm", ".apkx").any { ext -> fileName.endsWith(ext) }
+            if (!supported) {
+                "请选择 apk / zip / apks / xapk / apkm / apkx 文件".toast()
+            } else if (fileName.endsWith(".apk")) {
                 onNavigateToAppDetailWithUri(it)
             } else {
-                "请选择 apk / apks / xapk / apkm / apkx 文件".toast()
+                // 压缩包类：先确认里面确实有 apk（日志 zip 等无关压缩包在这里被拦下）
+                analyzerScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    val ok = zipContainsApk(context, it)
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        if (ok) onNavigateToAppDetailWithUri(it) else "该压缩包里没有找到 apk".toast()
+                    }
+                }
             }
         }
     }
@@ -461,6 +471,32 @@ fun SettingsScreen(
                 showDeviceNameDialog = false
             }
         )
+    }
+}
+
+/**
+ * 判断压缩包里是否含有 apk（.apk 文件或根目录 AndroidManifest.xml，后者对应 apks/xapk 里的拆分包之外的情况）。
+ * 只读条目名，命中即返回；最多看前 500 个条目。
+ */
+private fun zipContainsApk(context: Context, uri: Uri): Boolean {
+    return try {
+        context.contentResolver.openInputStream(uri)?.use { input ->
+            java.util.zip.ZipInputStream(input.buffered()).use { zis ->
+                var entry = zis.nextEntry
+                var count = 0
+                while (entry != null && count < 500) {
+                    val name = entry.name.lowercase()
+                    if (!entry.isDirectory && (name.endsWith(".apk") || name == "androidmanifest.xml")) {
+                        return true
+                    }
+                    entry = zis.nextEntry
+                    count++
+                }
+                false
+            }
+        } ?: false
+    } catch (_: Exception) {
+        false
     }
 }
 
