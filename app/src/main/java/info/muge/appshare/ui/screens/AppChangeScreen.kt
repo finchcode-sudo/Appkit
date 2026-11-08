@@ -23,7 +23,9 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.North
 import androidx.compose.material.icons.filled.East
 import androidx.compose.material.icons.filled.South
@@ -35,6 +37,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -47,6 +51,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.layout.ContentScale
@@ -61,6 +69,7 @@ import info.muge.appshare.data.AppChangeRecord
 import info.muge.appshare.data.AppChangeRepository
 import info.muge.appshare.data.ChangeType
 import info.muge.appshare.ui.theme.AppDimens
+import info.muge.appshare.utils.PinyinUtil
 import info.muge.appshare.utils.RecentIconCache
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -78,6 +87,31 @@ fun AppChangeScreen(
     val context = LocalContext.current
     var records by remember { mutableStateOf(AppChangeRepository.getRecords(context)) }
     var detailPackageName by remember { mutableStateOf<String?>(null) }
+    var searchText by remember { mutableStateOf("") }
+
+    // 拼音索引：每个应用名只算一次，避免输入时反复转换
+    val pinyinIndex = remember(records) {
+        records.map { it.appName }.distinct().associateWith { name ->
+            PinyinUtil.getFullSpell(name).lowercase(Locale.ROOT) to
+                PinyinUtil.getFirstSpell(name).lowercase(Locale.ROOT)
+        }
+    }
+    val filteredRecords = remember(records, searchText, pinyinIndex) {
+        val q = searchText.trim().lowercase(Locale.ROOT)
+        if (q.isEmpty()) {
+            records
+        } else {
+            val qNoSpace = q.replace(" ", "")
+            records.filter { r ->
+                val (full, first) = pinyinIndex[r.appName] ?: ("" to "")
+                r.appName.lowercase(Locale.ROOT).contains(q) ||
+                    r.packageName.lowercase(Locale.ROOT).contains(q) ||
+                    (r.versionName?.lowercase(Locale.ROOT)?.contains(q) == true) ||
+                    full.contains(qNoSpace) ||
+                    first.contains(qNoSpace)
+            }
+        }
+    }
 
     // 单个应用的完整历史时间线（点击列表项时弹出）
     detailPackageName?.let { pkg ->
@@ -155,46 +189,140 @@ fun AppChangeScreen(
                 }
             }
         } else {
-            // 按日期分组
-            val grouped = records.groupBy { record ->
-                getDateGroup(record.timestamp)
-            }
-
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(paddingValues)
-                    .padding(horizontal = AppDimens.Space.lg),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                grouped.forEach { (dateLabel, dayRecords) ->
-                    item {
-                        Text(
-                            text = dateLabel,
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 16.dp, bottom = 4.dp)
+                ChangeSearchField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            horizontal = AppDimens.Space.lg,
+                            vertical = AppDimens.Space.sm
                         )
+                )
+
+                if (filteredRecords.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(bottom = 64.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(
+                                imageVector = Icons.Default.Search,
+                                contentDescription = null,
+                                modifier = Modifier.size(48.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = "没有找到相关记录",
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                } else {
+                    // 按日期分组
+                    val grouped = filteredRecords.groupBy { record ->
+                        getDateGroup(record.timestamp)
                     }
 
-                    itemsIndexed(
-                        dayRecords,
-                        key = { index, record -> "${record.packageName}_${record.changeType}_${record.timestamp}_$index" }
-                    ) { _, record ->
-                        ChangeRecordCard(
-                            record = record,
-                            onClick = { detailPackageName = record.packageName }
-                        )
-                    }
-                }
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = AppDimens.Space.lg),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        grouped.forEach { (dateLabel, dayRecords) ->
+                            item(key = "header_$dateLabel") {
+                                Text(
+                                    text = dateLabel,
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                )
+                            }
 
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
+                            itemsIndexed(
+                                dayRecords,
+                                key = { index, record -> "${record.packageName}_${record.changeType}_${record.timestamp}_$index" }
+                            ) { _, record ->
+                                ChangeRecordCard(
+                                    record = record,
+                                    onClick = { detailPackageName = record.packageName }
+                                )
+                            }
+                        }
+
+                        item {
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                    }
                 }
             }
         }
     }
+}
+
+/**
+ * 列表顶部搜索框：圆角胶囊样式，与主页搜索栏保持一致，带清除按钮
+ */
+@Composable
+private fun ChangeSearchField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val focusManager = LocalFocusManager.current
+
+    TextField(
+        value = value,
+        onValueChange = onValueChange,
+        modifier = modifier,
+        singleLine = true,
+        placeholder = {
+            Text(
+                text = "搜索应用名、包名、版本或拼音",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        },
+        trailingIcon = {
+            if (value.isNotEmpty()) {
+                IconButton(onClick = { onValueChange("") }) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "清除",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        },
+        shape = RoundedCornerShape(AppDimens.Radius.xl),
+        colors = TextFieldDefaults.colors(
+            focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            unfocusedContainerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+            focusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent,
+            unfocusedIndicatorColor = androidx.compose.ui.graphics.Color.Transparent
+        ),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { focusManager.clearFocus() })
+    )
 }
 
 /**
