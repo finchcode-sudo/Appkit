@@ -127,8 +127,19 @@ fun SettingsScreen(
     // 由对方 App 自己的批量安装界面接管，不用我们循环调 startActivity（会被系统拦截第二次）。
     // 如果没有任何 App 能处理（ActivityNotFoundException），才退回我们自己的 PackageInstaller Session 兜底。
     val apkInstallLauncher = rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.GetMultipleContents()
-    ) { uris ->
+        contract = androidx.activity.result.contract.ActivityResultContracts.OpenMultipleDocuments()
+    ) { picked ->
+        if (picked.isEmpty()) return@rememberLauncherForActivityResult
+
+        // 与 APK 分析器同样的 MIME 白名单只能挡掉图片/视频等；这里再按扩展名筛一遍，
+        // 只保留 apk 和拆分包（apks/xapk/apkm/apkx），其余文件忽略并提示。
+        val uris = picked.filter { u ->
+            val name = info.muge.appshare.utils.SplitApkInstaller.queryDisplayName(context, u).lowercase()
+            name.endsWith(".apk") || info.muge.appshare.utils.SplitApkInstaller.isSplitContainer(name)
+        }
+        if (uris.size < picked.size) {
+            "已忽略 ${picked.size - uris.size} 个非 apk/apks/xapk/apkm/apkx 文件".toast()
+        }
         if (uris.isEmpty()) return@rememberLauncherForActivityResult
 
         uris.forEach { selectedUri ->
@@ -352,7 +363,7 @@ fun SettingsScreen(
             title = "安装 APK",
             value = "请选择一个或多个apk/apks/apkx/apkm文件进行安装",
             onClick = {
-                apkInstallLauncher.launch("*/*")
+                apkInstallLauncher.launch(apkAnalyzerMimeTypes)
             }
         )
 
