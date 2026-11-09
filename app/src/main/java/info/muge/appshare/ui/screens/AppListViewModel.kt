@@ -64,10 +64,10 @@ data class FilterConfig(
                 sizeRange != SizeRange.ALL ||
                 installerSources.isNotEmpty()
 
+    // 筛选按钮角标数：应用类型（用户/系统应用）不计入，只统计大小范围和安装来源
     val activeCount: Int
         get() {
             var count = 0
-            if (appType != AppTypeFilter.ALL) count++
             if (sizeRange != SizeRange.ALL) count++
             if (installerSources.isNotEmpty()) count++
             return count
